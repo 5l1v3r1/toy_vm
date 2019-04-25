@@ -89,6 +89,18 @@ void handle_interrupt(int signal);
 void mem_write(uint16_t address, uint16_t value);
 uint16_t mem_read(uint16_t addrress);
 
+
+// 定义 op 函数
+template <unsigned op> void ins(uint16_t);
+
+// 定义操作数数组
+static void (*op_table[16])(uint16_t) = {
+    ins<0>, ins<1>, ins<2>, ins<3>,
+    ins<4>, ins<5>, ins<6>, ins<7>,
+    NULL, ins<9>, ins<10>, ins<11>,
+    ins<12>, NULL, ins<14>, ins<15>, 
+};
+
 int main(int argc, const char *argv[]) {
 
     if(argc < 2) {
@@ -126,6 +138,11 @@ int main(int argc, const char *argv[]) {
     return 0;
 }
 
+template <unsigned op>
+void ins(uint16_t instr) {
+    // ADD 
+
+}
 int read_image(const char *image_path) {
 
     FILE *file = fopen(image_path, "rb");
