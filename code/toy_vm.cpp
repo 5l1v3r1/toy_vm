@@ -1,6 +1,16 @@
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/termios.h>
+#include <sys/mman.h>
+
 
 // 寄存器编号
 enum {
@@ -66,10 +76,18 @@ uint16_t memory[UINT16_MAX];
 
 // 寄存器
 uint16_t regs[R_COUNT];
+struct termios original_tio;
+int running = 1;
 
 int read_image(const char *image_path);
 void read_image_file(FILE *file);
 uint16_t swap16(uint16_t x);
+uint16_t check_key();
+void disable_input_buffering();
+void restore_input_buffering();
+void handle_interrupt(int signal);
+void mem_write(uint16_t address, uint16_t value);
+uint16_t mem_read(uint16_t addrress);
 
 int main(int argc, const char *argv[]) {
 
@@ -86,6 +104,25 @@ int main(int argc, const char *argv[]) {
         }
     }
 
+    // 终端
+
+    // Setup
+    signal(SIGINT, handle_interrupt);
+    disable_input_buffering();
+
+    enum {
+        PC_START = 0x3000
+    };
+    regs[R_PC] = PC_START;
+
+    // 取址执行
+    while (running) {
+        uint16_t instr = mem_read(regs[R_PC]++);
+        uint16_t op = instr >> 12;
+    }
+
+    // Shut Down
+    restore_input_buffering();
     return 0;
 }
 
@@ -125,4 +162,52 @@ void read_image_file(FILE *file) {
         *p = swap16(*p);
         p++;
     }
+}
+
+uint16_t check_key() {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    return select(1, &readfds, NULL, NULL, &timeout) != 0;
+}
+
+void disable_input_buffering() {
+    tcgetattr(STDIN_FILENO, &original_tio);
+    struct termios new_tio = original_tio;
+    new_tio.c_lflag &= ~ICANON & ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+}
+
+void restore_input_buffering() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &original_tio);
+}
+
+void handle_interrupt(int signal) {
+    restore_input_buffering();
+    printf("\n");
+    exit(-2);
+}
+
+void mem_write(uint16_t address, uint16_t value) {
+    memory[address] = value;
+}
+uint16_t mem_read(uint16_t address) {
+    // address 不可能超过 65535
+    if(address == MR_KBSR) {
+        // 特殊的内存寄存器映射
+
+        if(check_key()) {
+            // 轮循接受字符
+            // 也就是说，可以响应式接受字符
+            memory[MR_KBSR] = (1 << 15);
+            memory[MR_KBDR] = getchar();
+        } else {
+            memory[MR_KBDR] = 0;    
+        }
+    }
+    return memory[address];
 }
