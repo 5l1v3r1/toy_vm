@@ -11,6 +11,7 @@
 #include <sys/termios.h>
 #include <sys/mman.h>
 
+#include <iostream>
 
 // 寄存器编号
 enum {
@@ -88,18 +89,10 @@ void restore_input_buffering();
 void handle_interrupt(int signal);
 void mem_write(uint16_t address, uint16_t value);
 uint16_t mem_read(uint16_t addrress);
-
-
+void update_flag(uint16_t);
 // 定义 op 函数
-template <unsigned op> void ins(uint16_t);
-
-// 定义操作数数组
-static void (*op_table[16])(uint16_t) = {
-    ins<0>, ins<1>, ins<2>, ins<3>,
-    ins<4>, ins<5>, ins<6>, ins<7>,
-    NULL, ins<9>, ins<10>, ins<11>,
-    ins<12>, NULL, ins<14>, ins<15>, 
-};
+void ins(uint16_t);
+uint16_t sign_extend(uint16_t, int);
 
 int main(int argc, const char *argv[]) {
 
@@ -130,7 +123,7 @@ int main(int argc, const char *argv[]) {
     // 取址执行
     while (running) {
         uint16_t instr = mem_read(regs[R_PC]++);
-        uint16_t op = instr >> 12;
+        ins(instr);
     }
 
     // Shut Down
@@ -138,11 +131,56 @@ int main(int argc, const char *argv[]) {
     return 0;
 }
 
-template <unsigned op>
+void update_flag(uint16_t result) {
+    if(result > 0) {
+        regs[R_COND] = FL_POS;
+    } else if(result < 0) {
+        regs[R_COND] = FL_NEG;
+    } else {
+        regs[R_COND] = FL_ZEO;
+    }
+    
+}
+
+// 套路有符号拓展函数
+uint16_t sign_extend(uint16_t x, int bit_count) {
+    // 把有符号和无符号拓展写在一起
+    if((x >> (bit_count - 1)) & 1) {
+        x |= (0xFFFF << bit_count);
+    }
+    return x;
+} 
 void ins(uint16_t instr) {
-    // ADD 
+    // 记住要更新 flag
+    uint16_t op = instr >> 12;
+
+    switch (op) {
+        case OP_ADD:
+            uint16_t dr = (instr >> 9) & 0b111;
+            uint16_t sr = (instr >> 6) & 0b111;
+
+            uint16_t imm_flag = (instr >> 5) & 0b1;
+
+            if(imm_flag) {
+                regs[dr] = regs[sr] + sign_extend(instr & 0b11111, 5);
+            } else {
+                uint16_t sr1 = instr & 0b111;
+                regs[dr] = regs[sr] + regs[sr1];
+            }
+            update_flag(regs[dr]);
+            break;
+
+        // case OP_ADD:
+
+        //     break;
+    
+        default:
+            break;
+    }
+    
 
 }
+
 int read_image(const char *image_path) {
 
     FILE *file = fopen(image_path, "rb");
