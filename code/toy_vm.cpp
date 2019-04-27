@@ -156,24 +156,138 @@ void ins(uint16_t instr) {
 
     switch (op) {
         case OP_ADD:
+            {
             uint16_t dr = (instr >> 9) & 0b111;
-            uint16_t sr = (instr >> 6) & 0b111;
+                uint16_t sr = (instr >> 6) & 0b111;
 
-            uint16_t imm_flag = (instr >> 5) & 0b1;
+                uint16_t imm_flag = (instr >> 5) & 0b1;
 
-            if(imm_flag) {
-                regs[dr] = regs[sr] + sign_extend(instr & 0b11111, 5);
-            } else {
-                uint16_t sr1 = instr & 0b111;
-                regs[dr] = regs[sr] + regs[sr1];
+                if(imm_flag) {
+                    regs[dr] = regs[sr] + sign_extend(instr & 0b11111, 5);
+                } else {
+                    uint16_t sr1 = instr & 0b111;
+                    regs[dr] = regs[sr] + regs[sr1];
+                }
+                update_flag(regs[dr]);
             }
-            update_flag(regs[dr]);
             break;
 
-        // case OP_ADD:
+        case OP_AND: 
+            {
+                uint16_t dr = (instr >> 9) & 0b111;
+                uint16_t sr = (instr >> 6) & 0b111;
 
-        //     break;
-    
+                uint16_t imm_flag = (instr >> 5) & 0b1;
+
+                if(imm_flag) {
+                    regs[dr] = regs[sr] & sign_extend(instr & 0b11111, 5);
+                } else {
+                    uint16_t sr1 = instr & 0b111;
+                    regs[dr] = regs[sr] & regs[sr1];
+                }
+                update_flag(regs[dr]);
+            }
+            break;
+
+        case OP_BR:
+            {
+                uint16_t cond_flag = (instr >> 9) & 0b111;
+                if(cond_flag & regs[R_COND]) {
+                    uint16_t pc_offset = sign_extend(instr & 0b111111111, 9);
+                    regs[R_PC] += pc_offset;
+                }
+            }
+            break;
+        case OP_JMP:
+            {
+                uint16_t base_r = (instr >> 6) & 0b111;
+                regs[R_PC] = base_r;
+            }
+            break;
+        case OP_JSR:
+            {
+                uint16_t flag = (instr >> 11) & 0b1;
+                if(flag) {
+                    // JSR
+                    uint16_t pc_offset = sign_extend(instr & 0x7FF, 11);
+                    regs[R_PC] += pc_offset;
+                }else {
+                    // JSRR
+                    uint16_t base_r = (instr >> 6) & 0x7;
+                    regs[R_PC] = base_r; 
+                }
+            }
+            break;
+
+        case OP_LD:
+            {
+                uint16_t dr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                uint16_t address = regs[R_PC] + pc_offset; 
+                regs[dr] = address;
+            }
+            break;
+        case OP_LDI:
+            {
+                uint16_t dr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                uint16_t add = regs[R_PC] + pc_offset;
+                uint16_t add1 = memory[add];
+                regs[dr] = add1;
+            }
+            break;
+        case OP_LDR:
+            {
+                uint16_t dr = (instr >> 9) & 0x7;
+                uint16_t base_r = (instr >> 6) & 0b111;
+                uint16_t pc_offset = sign_extend(instr & 0x3F, 6);
+                regs[dr] = memory[base_r + pc_offset];
+            }
+            break;
+        case OP_LEA:
+            {
+                uint16_t dr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                regs[dr] = regs[R_PC] + pc_offset;
+            }
+            break;
+
+        case OP_NOT:
+            {
+                uint16_t dr = (instr >> 9) & 0x7;
+                uint16_t sr = (instr >> 6) & 0x7;
+
+                regs[dr] = ~regs[sr];
+            }
+            break;
+
+        case OP_ST:
+            {
+                uint16_t sr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                uint16_t add = regs[R_PC] + pc_offset;
+                memory[add] = regs[sr];
+            }
+            break;
+
+        case OP_STI:
+            {
+                uint16_t sr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                uint16_t add = regs[R_PC] + pc_offset;
+                uint16_t add1 = memory[add];
+                memory[add1] = regs[sr];
+            }
+            break;
+
+        case OP_STR:
+            {
+                uint16_t sr = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x3F, 6);
+                uint16_t base_r = (instr >> 6) & 0x7;
+                memory[base_r + pc_offset] = regs[sr];
+            }
+            break;  
         default:
             break;
     }
