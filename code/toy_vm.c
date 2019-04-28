@@ -99,6 +99,7 @@ void reset();
 
 int main(int argc, const char *argv[]) {
 
+    // test();
     if(argc < 2) {
         printf("缺少文件地址");
         exit(2);
@@ -169,6 +170,24 @@ void ins(uint16_t instr) {
     switch (op) {
         case OP_ADD:
             {
+                // uint16_t r0 = (instr >> 9) & 0x7;
+                // /* first operand (SR1) */
+                // uint16_t r1 = (instr >> 6) & 0x7;
+                // /* whether we are in immediate mode */
+                // uint16_t imm_flag = (instr >> 5) & 0x1;
+
+                // if (imm_flag)
+                // {
+                //     uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                //     reg[r0] = reg[r1] + imm5;
+                // }
+                // else
+                // {
+                //     uint16_t r2 = instr & 0x7;
+                //     reg[r0] = reg[r1] + reg[r2];
+                // }
+
+                // update_flags(r0);
                 uint16_t dr = (instr >> 9) & 0b111;
                 uint16_t sr = (instr >> 6) & 0b111;
 
@@ -202,6 +221,16 @@ void ins(uint16_t instr) {
             break;
 
         case OP_BR:
+            // {
+            //     uint16_t pc_offset = sign_extend((instr)&0x1ff, 9);
+            //     uint16_t cond_flag = (instr >> 9) & 0x7;
+            //     if (cond_flag & reg[R_COND])
+            //     {
+            //         reg[R_PC] += pc_offset;
+            //     }
+            // }
+
+            // break;
             {
                 uint16_t cond_flag = (instr >> 9) & 0b111;
                 if(cond_flag & regs[R_COND]) {
@@ -211,7 +240,11 @@ void ins(uint16_t instr) {
             }
             break;
         case OP_JMP:
-
+            // {
+            //     /* Also handles RET */
+            //     uint16_t r1 = (instr >> 6) & 0x7;
+            //     reg[R_PC] = reg[r1];
+            // }
             {
                 uint16_t base_r = (instr >> 6) & 0b111;
                 regs[R_PC] = regs[base_r];
@@ -220,6 +253,20 @@ void ins(uint16_t instr) {
             break;
         case OP_JSR:
             {
+                // uint16_t r1 = (instr >> 6) & 0x7;
+                // uint16_t long_pc_offset = sign_extend(instr & 0x7ff, 11);
+                // uint16_t long_flag = (instr >> 11) & 1;
+
+                // reg[R_R7] = reg[R_PC];
+                // if (long_flag)
+                // {
+                //     reg[R_PC] += long_pc_offset; /* JSR */
+                // }
+                // else
+                // {
+                //     reg[R_PC] = reg[r1]; /* JSRR */
+                // }
+                // break;
                 uint16_t flag = (instr >> 11) & 0b1;
                 regs[R_R7] = regs[R_PC];
                 if(flag) {
@@ -245,6 +292,13 @@ void ins(uint16_t instr) {
             break;
         case OP_LDI:
             {
+
+                // uint16_t r0 = (instr >> 9) & 0x7;
+                // /* PCoffset 9*/
+                // uint16_t pc_offset = sign_extend(instr & 0x1ff, 9);
+                // /* add pc_offset to the current PC, look at that memory location to get the final address */
+                // reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+                // update_flags(r0);
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t add = regs[R_PC] + pc_offset;
@@ -255,6 +309,12 @@ void ins(uint16_t instr) {
             break;
         case OP_LDR:
             {
+
+                // uint16_t r0 = (instr >> 9) & 0x7;
+                // uint16_t r1 = (instr >> 6) & 0x7;
+                // uint16_t offset = sign_extend(instr & 0x3F, 6);
+                // reg[r0] = mem_read(reg[r1] + offset);
+                // update_flags(r0);
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t base_r = (instr >> 6) & 0b111;
                 uint16_t pc_offset = sign_extend(instr & 0x3F, 6);
@@ -283,6 +343,9 @@ void ins(uint16_t instr) {
 
         case OP_ST:
             {
+                // uint16_t r0 = (instr >> 9) & 0x7;
+                // uint16_t pc_offset = sign_extend(instr & 0x1ff, 9);
+                // mem_write(reg[R_PC] + pc_offset, reg[r0]);
                 uint16_t sr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t add = regs[R_PC] + pc_offset;
@@ -458,9 +521,8 @@ void test() {
     {
         // JSR
         instr = 0b0100100000000100;
-        uint16_t origin_pc = regs[R_PC];
         ins(instr);
-        output_assert(regs[R_PC] == 12 && regs[R_R7] = origin_pc, "OP_JSR √");
+        output_assert(regs[R_PC] == 12, "OP_JSR √");
         reset();
 
         // JSRR
@@ -633,3 +695,20 @@ uint16_t mem_read(uint16_t address) {
     }
     return memory[address];
 }
+
+// uint16_t mem_read(uint16_t address)
+// {
+//     if (address == MR_KBSR)
+//     {
+//         if (check_key())
+//         {
+//             memory[MR_KBSR] = (1 << 15);
+//             memory[MR_KBDR] = getchar();
+//         }
+//         else
+//         {
+//             memory[MR_KBSR] = 0;
+//         }
+//     }
+//     return memory[address];
+// }
