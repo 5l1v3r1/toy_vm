@@ -10,8 +10,7 @@
 #include <sys/types.h>
 #include <sys/termios.h>
 #include <sys/mman.h>
-
-#include <iostream>
+#include <assert.h>
 
 // 寄存器编号
 enum {
@@ -94,40 +93,45 @@ void update_flag(uint16_t);
 void ins(uint16_t);
 uint16_t sign_extend(uint16_t, int);
 
+void output_assert(int, const char *);
+void test();
+void reset();
+
 int main(int argc, const char *argv[]) {
 
-    if(argc < 2) {
-        printf("缺少文件地址");
-        exit(2);
-    }
+    test();
+    // if(argc < 2) {
+    //     printf("缺少文件地址");
+    //     exit(2);
+    // }
 
-    // 将文件读入内存
-    for(int i = 1; i < argc; i++) {
-        if(!read_image(argv[i])) {
-            printf("没有找到 image 文件");
-            exit(1);
-        }
-    }
+    // // 将文件读入内存
+    // for(int i = 1; i < argc; i++) {
+    //     if(!read_image(argv[i])) {
+    //         printf("没有找到 image 文件");
+    //         exit(1);
+    //     }
+    // }
 
-    // 终端
+    // // 终端
 
-    // Setup
-    signal(SIGINT, handle_interrupt);
-    disable_input_buffering();
+    // // Setup
+    // signal(SIGINT, handle_interrupt);
+    // disable_input_buffering();
 
-    enum {
-        PC_START = 0x3000
-    };
-    regs[R_PC] = PC_START;
+    // enum {
+    //     PC_START = 0x3000
+    // };
+    // regs[R_PC] = PC_START;
 
-    // 取址执行
-    while (running) {
-        uint16_t instr = mem_read(regs[R_PC]++);
-        ins(instr);
-    }
+    // // 取址执行
+    // while (running) {
+    //     uint16_t instr = mem_read(regs[R_PC]++);
+    //     ins(instr);
+    // }
 
-    // Shut Down
-    restore_input_buffering();
+    // // Shut Down
+    // restore_input_buffering();
     return 0;
 }
 
@@ -153,11 +157,11 @@ uint16_t sign_extend(uint16_t x, int bit_count) {
 void ins(uint16_t instr) {
     // 记住要更新 flag
     uint16_t op = instr >> 12;
-
+    // printf("op %u \n", op);
     switch (op) {
         case OP_ADD:
             {
-            uint16_t dr = (instr >> 9) & 0b111;
+                uint16_t dr = (instr >> 9) & 0b111;
                 uint16_t sr = (instr >> 6) & 0b111;
 
                 uint16_t imm_flag = (instr >> 5) & 0b1;
@@ -224,7 +228,8 @@ void ins(uint16_t instr) {
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t address = regs[R_PC] + pc_offset; 
-                regs[dr] = address;
+                regs[dr] = mem_read(address);
+                update_flag(regs[dr]);
             }
             break;
         case OP_LDI:
@@ -232,8 +237,9 @@ void ins(uint16_t instr) {
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t add = regs[R_PC] + pc_offset;
-                uint16_t add1 = memory[add];
-                regs[dr] = add1;
+                uint16_t add1 = mem_read(add);
+                regs[dr] = mem_read(add1);
+                update_flag(regs[dr]);
             }
             break;
         case OP_LDR:
@@ -241,7 +247,8 @@ void ins(uint16_t instr) {
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t base_r = (instr >> 6) & 0b111;
                 uint16_t pc_offset = sign_extend(instr & 0x3F, 6);
-                regs[dr] = memory[base_r + pc_offset];
+                regs[dr] = mem_read(base_r + pc_offset);
+                update_flag(regs[dr]);
             }
             break;
         case OP_LEA:
@@ -249,6 +256,7 @@ void ins(uint16_t instr) {
                 uint16_t dr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 regs[dr] = regs[R_PC] + pc_offset;
+                update_flag(regs[dr]);
             }
             break;
 
@@ -258,6 +266,7 @@ void ins(uint16_t instr) {
                 uint16_t sr = (instr >> 6) & 0x7;
 
                 regs[dr] = ~regs[sr];
+                update_flag(regs[dr]);
             }
             break;
 
@@ -266,7 +275,7 @@ void ins(uint16_t instr) {
                 uint16_t sr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t add = regs[R_PC] + pc_offset;
-                memory[add] = regs[sr];
+                mem_write(add, regs[sr]);
             }
             break;
 
@@ -275,8 +284,8 @@ void ins(uint16_t instr) {
                 uint16_t sr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
                 uint16_t add = regs[R_PC] + pc_offset;
-                uint16_t add1 = memory[add];
-                memory[add1] = regs[sr];
+                uint16_t add1 = mem_read(add);
+                mem_write(add1, regs[sr]);
             }
             break;
 
@@ -285,14 +294,245 @@ void ins(uint16_t instr) {
                 uint16_t sr = (instr >> 9) & 0x7;
                 uint16_t pc_offset = sign_extend(instr & 0x3F, 6);
                 uint16_t base_r = (instr >> 6) & 0x7;
-                memory[base_r + pc_offset] = regs[sr];
+                mem_write(base_r + pc_offset, regs[sr]);
             }
-            break;  
+            break;
+        case OP_TRAP:
+            // trap code system call
+            {
+                uint16_t trap_vect = instr & 0xFF;
+                switch (trap_vect)
+                {
+                    case TRAP_GETC:
+                        {
+                            regs[R_R0] = (uint16_t)getchar();
+                        }
+                        break;
+                    
+                    case TRAP_OUT:
+                        // 放一个字符在 stdout 中
+                        {
+                            putc((char)regs[R_R0], stdout);
+                            fflush(stdout);
+                        }
+                        break;
+
+                    case TRAP_PUTS:
+                        // 写一串字符
+                        {
+                            uint16_t *c = memory + regs[R_R0];
+                            while(*c) {
+                                putc((char)*c, stdout);
+                                ++c;
+                            }
+                            fflush(stdout);
+                        }
+                        break;
+
+                    case TRAP_IN:
+                        {
+                            printf("Enter a character: ");
+                            char c = getchar();
+                            putc(c, stdout);
+                            regs[R_R0] = (uint16_t)c;
+                        }
+                        break;
+                    case TRAP_PUTSP:
+                        // Write a string of ASCII characters to the console.
+                        // 先输出右八位 再输出左边八位
+                        // 如果这个字符串是奇数字符串，那么最后一个左八位 是 0
+                        {
+                            uint16_t *c = memory + regs[R_R0];
+
+                            while(*c) {
+                                char cha = (*c) & 0xFF;
+                                putc(cha, stdout);
+                                char cha1 = (*c) >> 8;
+                                if(cha1) {
+                                    putc(cha, stdout);
+                                }
+                                c++;
+                            }
+                            fflush(stdout);
+                        }
+                        break;
+                    case TRAP_HALT:
+                        {
+                            puts("HALT");
+                            fflush(stdout);
+                            running = 0;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+
+            } 
+            break;
+
+        case OP_RES:
+        case OP_RTI:
         default:
+            // bad code
+            abort();
             break;
     }
     
 
+}
+
+void reset() {
+    for(int i = 0; i < R_COUNT; i++) {
+        regs[i] = i;
+    }
+
+    for(int i = 0; i < 65535; i++) {
+        memory[i] = 0;
+    }
+}
+void output_assert(int expression, const char *s) {
+    assert(expression);
+    printf("%s\n", s);
+}
+
+void test() {
+    uint16_t instr;
+    printf("开始测试：\n");
+    {
+        // ADD
+        regs[1] = 0;
+        regs[2] = 1;
+        regs[3] = 2;
+        instr = 0b0001001010000011;
+        ins(instr);
+        assert(regs[1] == 3);
+        reset();
+
+        instr = 0b0001001111101000;
+        regs[1] = 0;
+        regs[7] = 10;
+        ins(instr);
+        output_assert(regs[1] == 18, "OP_ADD √");
+        reset();
+    }
+    {
+        // AND
+        instr = 0b0101000001000010;
+        ins(instr);
+        assert(regs[0] == 0);
+        reset();
+        instr = 0b0101001111101000;
+        ins(instr);
+        output_assert(regs[1] == 0, "OP_AND √");
+        reset();
+    }
+    {
+        // BR
+        regs[R_PC] = 10;
+        regs[R_COND] = 0b100;
+        instr = 0b0000100000000010;
+        ins(instr);
+        output_assert(regs[R_PC] == 12, "OP_BR √");
+        reset();
+    }
+    {
+        // JMP
+        instr = 0b1100000111000010;
+        ins(instr);
+        output_assert(regs[R_PC] == 7, "OP_JMP √");
+        reset();
+    }
+    {
+        // JSR
+        instr = 0b0100100000000100;
+        ins(instr);
+        output_assert(regs[R_PC] == 12, "OP_JSR √");
+        reset();
+
+        // JSRR
+        instr = 0b0100000111000000;
+        ins(instr);
+        output_assert(regs[R_PC] == 7, "OP_JSRR √");
+        reset();
+    }
+    {
+        // LD
+        instr = 0b0010111000000011;
+        regs[R_PC] = 1;
+        uint16_t add = regs[R_PC] + sign_extend(3, 9);
+        memory[add] = 10;
+        ins(instr);
+        output_assert(regs[7] == 10, "OP_LD √");
+        reset();
+    }
+    {
+        // LDI
+        instr = 0b1010111000000010;
+        regs[R_PC] = 1;
+        uint16_t add = regs[R_PC] + sign_extend(2, 9);
+        mem_write(add, 10);
+        uint16_t add1 = mem_read(add);
+        mem_write(add1, 100);
+        ins(instr);
+        output_assert(regs[7] == 100, "OP_LDI √");
+        reset();
+    }
+    {
+        // LDR
+        instr = 0b0110111111000010;
+        uint16_t add = 9;
+        mem_write(add, 10);
+        ins(instr);
+        output_assert(regs[7] == 10, "OP_LDR √");
+        reset();
+    }
+    {
+        // LEA
+        instr = 0b1110111000000010;
+        regs[R_PC] = 10;
+        ins(instr);
+        output_assert(regs[7] == 12, "OP_LEA √");
+        reset();
+    }
+    {   
+        // NOT
+        instr = 0b1001111000111111;
+        regs[0] = 0b1111111111111111;
+        ins(instr);
+        output_assert(regs[7] == 0, "OP_NOT √");
+        reset();
+    }
+    {
+        // ST
+        instr = 0b0011111000000001;
+        regs[7] = 7;
+        regs[R_PC] = 1;
+        uint16_t add = regs[R_PC] + sign_extend(1, 9);
+        ins(instr);
+        output_assert(regs[7] == mem_read(add), "OP_ST √");
+        reset();
+    }
+    {
+        // STI
+        instr = 0b1011111000000001;
+        regs[7] = 7;
+        regs[R_PC] = 1;
+        uint16_t add = regs[R_PC] + sign_extend(1, 9);
+        mem_write(add, 10);
+        ins(instr);
+        output_assert(regs[7] == mem_read(10), "OP_STI √");
+        reset();
+    }
+    {
+        // STR
+        instr = 0b0111111000000001;
+        regs[7] = 7;
+        uint16_t add = 0 + sign_extend(1, 6);
+        ins(instr);
+        output_assert(regs[7] == mem_read(add), "OP_STR √");
+        reset();
+    }
 }
 
 int read_image(const char *image_path) {
