@@ -12,6 +12,10 @@
 
 
 
+![](https://github.com/TensShinet/toy_vm/blob/master/images/2048.png?raw=true)
+
+
+
 在 `code` 文件夹中我实现了自己的 `toy_vm` 。除了实现指令之外，还要进行调试，非常花时间，各位加油 :(
 
 
