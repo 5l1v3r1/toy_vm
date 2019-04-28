@@ -4,7 +4,7 @@
 
 
 
-## 指令备忘单（Instruction Cheat Sheet）
+## 实现所有指令（Instruction Cheat Sheet）
 
 
 
