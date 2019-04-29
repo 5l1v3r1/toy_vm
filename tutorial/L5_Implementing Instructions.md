@@ -8,17 +8,17 @@
 
 
 
-现在的任务是完成上一篇文章中 opcode 对应的代码 。每个指令的详细规格包含在[项目文档](https://justinmeiners.github.io/lc3-vm/supplies/lc3-isa.pdf)中。你需要了解每条指令如何从其规范中工作并编写实现。这比听起来容易。我将在这里演示如何实现其中两个。其余的代码可以在下一节中找到。
+现在的任务是完成上一篇文章中 opcode 对应的代码 。每个指令的详细实现包含在[说明书](https://justinmeiners.github.io/lc3-vm/supplies/lc3-isa.pdf)（详细描述操作码作用与实现的册子）中。你需要了解每条指令如何从其中工作并编写实现。这比听起来容易。我将在这里演示如何实现其中两个。其余的代码可以在下一节中找到。
 
 
 
 + **ADD**
 
-ADD 指令采用两个数字，将它们相加，并将结果存储在寄存器中。有关它的规范，请参见第 526 页。每条 ADD 指令如下所示：
+ADD 指令使用两个数字，将它们相加，并将结果存储在寄存器中。有关它的说明，请参见第 526 页。两条 ADD 指令如下所示：
 
 ![Add Encoding](https://justinmeiners.github.io/lc3-vm/img/add_layout.gif)
 
-编码显示两行，因为此指令有两种不同的“模式”。在我解释模式之前，让我们试着找出它们之间的相似之处。在这两行中，我们可以看到我们从 4 位 0001 开始。这是 OP_ADD 的操作码值。接下来的 3 位标记为 DR。这代表目的地寄存器（destination register）。目的寄存器是存储和的位置。接下来的 3 位是 SR1。这是要求和的第一个数字的寄存器。
+ADD 指令有两行，因为此指令有两种不同的“模式”。在我详解模式之前，让我们试着找出它们之间的相似之处。在这两行中，我们可以看到前 4 位 0001，这是 OP_ADD 的操作码值。接下来的 3 位标记为 DR。这代表目的地寄存器（destination register）。目的寄存器是存储和的位置。接下来的 3 位是 SR1。这是要求和的第一个数字的寄存器。
 
 
 
@@ -42,7 +42,7 @@ ADD R0 R0 1 ; add 1 to R0 and store back in R0
 
 
 
-以下摘自[项目文档](https://justinmeiners.github.io/lc3-vm/supplies/lc3-isa.pdf)：
+以下摘自[说明书](https://justinmeiners.github.io/lc3-vm/supplies/lc3-isa.pdf)：
 
 > If bit [5] is 0, the second source operand is obtained from SR2. If bit [5] is 1, the second source operand is obtained by **sign-extending** the imm5 field to 16 bits. In both cases, the second source operand is added to the contents of SR1 and the result stored in DR. (Pg. 526)
 
@@ -69,11 +69,11 @@ uint16_t sign_extend(uint16_t x, int bit_count)
 
 
 
-说明书中有最后一句话：
+说明书中还有一句话：
 
 
 
-> 根据结果是负，零还是正，设置条件代码。 （第 526 页）（The condition codes are set, based on whether the result is negative, zero, or positive. (Pg. 526)）
+> 根据结果是负，零还是正，设置条件标志。 
 
 
 
@@ -144,9 +144,9 @@ void update_flags(uint16_t r)
 
 
 
-### LDI
++ **LDI**
 
-LDI 代表“间接负载”。该指令用于将值从存储器中的位置加载到寄存器中。规范见第 532 页。
+LDI 代表“间接加载”。该指令用于将值从内存加载到寄存器中。见说明书第 532 页。
 
 这是二进制代码的样子
 
@@ -154,7 +154,7 @@ LDI 代表“间接负载”。该指令用于将值从存储器中的位置加�
 
 
 
-与 ADD 相比，没有不同的模式而且参数更少。这次，操作码是1010，它对应于 OP_LDI 枚举值。与 ADD 一样，它包含一个 3 位DR（目标寄存器），用于存储加载的值。其余位标记为 PCoffset9。这是嵌入指令的直接值（类似于 imm5 ）。由于该指令从内存加载，我们可以猜测这个数字是某种地址告诉我们从哪里加载。说明书提供了更多细节：
+与 ADD 相比，没有不同的模式而且参数更少。这次，操作码是1010，它对应于 OP_LDI 枚举值。与 ADD 一样，它包含一个 3 位DR（目标寄存器），用于存储加载的值。其余位标记为 PCoffset9。这是嵌入指令的直接值（类似于 imm5 ）。由于该指令从内存加载数据，我们可以猜测这个数字是某种地址告诉我们从哪里加载。说明书提供了更多细节：
 
 
 
@@ -166,7 +166,7 @@ LDI 代表“间接负载”。该指令用于将值从存储器中的位置加�
 
 
 
-这似乎是一种从内存中读取的迂回方式，但它是不可或缺的。 LD 指令仅限于 9 位的地址偏移，而存储器需要 16 位来寻址。 LDI 对于加载存储在远离当前 PC 的位置的值很有用，但是要使用它，最终位置的地址需要存储在附近的邻域中。你可以把它想象成在 C 中有一个局部变量，它是一个指向某些数据的指针：
+这似乎是一种从内存中读取的迂回方式，但它是不可或缺的。 LD 指令仅限于 9 位的地址偏移，而内存需要 16 位来寻址。 LDI 对于加载存储在远离当前 PC 的位置的值很有用，但是要使用它，最终位置的地址需要存储在附近的邻域中。你可以把它想象成在 C 中有一个局部变量，它是一个指向某些数据的指针：
 
 
 
@@ -189,7 +189,7 @@ char* far_data = "apple";
 
 
 
-与之前相同，在将值放入 DR 后需要更新标志
+与之前相同，在将值放入 DR 后需要更新条件标志
 
 
 
