@@ -2,17 +2,17 @@
 
 
 
-前言：这是 Write your Own Virtual Machine 的第八篇文章。主要是来给出所有陷入例程的代码 。原文在[这里](https://justinmeiners.github.io/lc3-vm/)。
+前言：这是 Write your Own Virtual Machine 的第八篇文章。主要是来给出所有陷阱例程的代码 。原文在[这里](https://justinmeiners.github.io/lc3-vm/)。
 
 
 
 
 
-##  陷入例程代码对照表（Trap Routine Cheat Sheet）
+##  陷阱例程代码对照表（Trap Routine Cheat Sheet）
 
 
 
-本节包含剩余陷入例程的完整代码实现。
+本节包含剩余陷阱例程的完整代码实现。
 
 
 
